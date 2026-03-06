@@ -11,29 +11,78 @@
 #include <QCoreApplication>
 #include <QDebug>
 #include <QFile>
+#include <QMap>
+#include <QSet>
+#include <QTextStream>
+
+#include <QCommandLineParser>
+#include <QCommandLineOption>
+
 #include "qt-linguist-shared/translator.h"
+
+using StrMap = QMap<QString, QString>; // source -> translated
 
 int main(int argc, char* argv[])
 {
-	QCoreApplication a(argc, argv);
+	QCoreApplication   app(argc, argv);
+	QCommandLineParser parser;
+	parser.addHelpOption();
 
-	Translator                    t;
-	QList<Translator::FileFormat> formats = t.registeredFileFormats();
+	QCommandLineOption tsFileOption("ts", "the ts file", "TS_FILE");
+	QCommandLineOption generateTxtOption("generate", "generate the list", "TXT_FILE");
 
-	qDebug() << formats.size();
-	if (!formats.isEmpty()) {
-		ConversionData cd;
-		if (t.load("/tmp/app_ja.ts", cd, "ts")) {
-			qDebug() << "loaded languageCode" << t.languageCode() << "messageCount=" << t.messageCount();
-			const int messageCount = t.messageCount();
-			for (int i = 0; i < messageCount; ++i) {
-				const TranslatorMessage& msg = t.message(i);
-				qDebug() << "i=" << i << msg.sourceText();
-			}
+	parser.addOption(tsFileOption);
+	parser.addOption(generateTxtOption);
 
-			t.message(0).setTranslation("FUCK");
-			t.save("/tmp/app_ja-11111.ts", cd, "ts");
+	parser.process(app);
+	if (!parser.isSet(tsFileOption)) {
+		qCritical("You need to specify the ts file");
+		return 1;
+	}
+
+	const QString tsFilepath = parser.value(tsFileOption);
+
+	Translator     translator;
+	ConversionData cd;
+
+	if (translator.registeredFileFormats().isEmpty()) {
+		qCritical("No registered file formats");
+		return 1;
+	}
+
+	if (translator.load(tsFilepath, cd, "ts")) {
+		qDebug() << "loaded languageCode=" << translator.languageCode() << "messageCount=" << translator.messageCount();
+	} else {
+		qCritical("Can not load %s", qPrintable(tsFilepath));
+		return 1;
+	}
+
+	if (parser.isSet(generateTxtOption)) {
+		const QString generateFilepath = parser.value(generateTxtOption);
+		QSet<QString> sourceTextSet;
+
+		QFile file(generateFilepath);
+		if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
+			qCritical("Can not open %s", qPrintable(generateFilepath));
+			return 1;
 		}
+
+		QTextStream textStream(&file);
+
+		const int messageCount = translator.messageCount();
+		for (int i = 0; i < messageCount; ++i) {
+			const TranslatorMessage& msg = translator.message(i);
+			const QString            src = msg.sourceText();
+			if (!sourceTextSet.contains(src)) {
+				sourceTextSet.insert(src);
+				textStream << src << Qt::endl;
+			}
+		}
+
+		// translator.message(0).setTranslation("FUCK");
+		// translator.save("/tmp/app_ja-11111.ts", cd, "ts");
+		qDebug("Saved to %s", qPrintable(generateFilepath));
+		return 0;
 	}
 
 	return 0;
