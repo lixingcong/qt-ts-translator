@@ -14,6 +14,7 @@
 #include <QMap>
 #include <QSet>
 #include <QTextStream>
+#include <QFileInfo>
 
 #include <QCommandLineParser>
 #include <QCommandLineOption>
@@ -28,19 +29,21 @@ int main(int argc, char* argv[])
 	QCommandLineParser parser;
 	parser.addHelpOption();
 
-	QCommandLineOption tsFileOption("ts", "the ts file", "TS_FILE");
-	QCommandLineOption generateTxtOption("generate", "generate the list", "TXT_FILE");
+	QCommandLineOption inputTsFileOption("ts", "TS file for input", "TS_FILE");
+	QCommandLineOption txtOption("txt", "Txt file for save/load as dict", "TXT_FILE");
+	QCommandLineOption outputTsFileOption("ts-out", "TS file for output", "TS_FILE");
 
-	parser.addOption(tsFileOption);
-	parser.addOption(generateTxtOption);
+	parser.addOption(inputTsFileOption);
+	parser.addOption(txtOption);
+	parser.addOption(outputTsFileOption);
 
 	parser.process(app);
-	if (!parser.isSet(tsFileOption)) {
+	if (!parser.isSet(inputTsFileOption)) {
 		qCritical("You need to specify the ts file");
 		return 1;
 	}
 
-	const QString tsFilepath = parser.value(tsFileOption);
+	const QString tsFilepath = parser.value(inputTsFileOption);
 
 	Translator     translator;
 	ConversionData cd;
@@ -57,13 +60,31 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
-	if (parser.isSet(generateTxtOption)) {
-		const QString generateFilepath = parser.value(generateTxtOption);
+	if (!parser.isSet(txtOption)) {
+		qCritical("You need to specify the txt file to save/load as dictionary");
+		return 1;
+	}
+
+	const QString txtFilepath = parser.value(txtOption);
+
+	if (!parser.isSet(outputTsFileOption)) {
+		// txt已存在
+		if (QFileInfo(txtFilepath).isFile()) {
+			qInfo("Are you sure to overwrite %s? (y/n)", qPrintable(txtFilepath));
+
+			QTextStream in(stdin);
+			if (in.readLine() != "y") {
+				qInfo("You choose not to overwrite");
+				return 0;
+			}
+		}
+
+		// 生成txt
 		QSet<QString> sourceTextSet;
 
-		QFile file(generateFilepath);
+		QFile file(txtFilepath);
 		if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
-			qCritical("Can not open %s", qPrintable(generateFilepath));
+			qCritical("Can not open %s", qPrintable(txtFilepath));
 			return 1;
 		}
 
@@ -81,8 +102,10 @@ int main(int argc, char* argv[])
 
 		// translator.message(0).setTranslation("FUCK");
 		// translator.save("/tmp/app_ja-11111.ts", cd, "ts");
-		qDebug("Saved to %s", qPrintable(generateFilepath));
+		qDebug("Saved to %s", qPrintable(txtFilepath));
 		return 0;
+	}else{
+		// 输出新的ts文件
 	}
 
 	return 0;
