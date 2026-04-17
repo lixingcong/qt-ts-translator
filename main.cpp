@@ -44,10 +44,12 @@ int main(int argc, char* argv[])
 	QCommandLineOption inputTsFileOption("ts", "TS file for input", "TS_FILE");
 	QCommandLineOption outputTsFileOption("ts-out", "TS file for output", "TS_FILE");
 	QCommandLineOption dictTxtOption("txt", "Txt file for save/load as dict", "TXT_FILE");
+	QCommandLineOption ignoreFinishedOption("ignore-finished", "Ignore finished items of ts file");
 
 	parser.addOption(inputTsFileOption);
 	parser.addOption(outputTsFileOption);
 	parser.addOption(dictTxtOption);
+	parser.addOption(ignoreFinishedOption);
 
 	parser.process(app);
 	if (!parser.isSet(inputTsFileOption)) {
@@ -79,6 +81,7 @@ int main(int argc, char* argv[])
 
 	const QString dictTxtFilepath = parser.value(dictTxtOption);
 	const int     messageCount    = translator.messageCount();
+	const bool    ignoreFinished  = parser.isSet(ignoreFinishedOption);
 
 	QMap<QString, int> srcToTxtFileLineNum;
 	QStringList        srcParsedTexts;
@@ -91,7 +94,10 @@ int main(int argc, char* argv[])
 			const TranslatorMessage::Type msgType = msg.type();
 
 			if (TranslatorMessage::Vanished == msgType || TranslatorMessage::Obsolete == msgType)
-				continue; // ignore
+				continue; // ignore invalid
+
+			if (ignoreFinished && TranslatorMessage::Finished == msgType)
+				continue; // ignore finished
 
 			const QString src = msg.sourceText();
 
@@ -171,6 +177,9 @@ int main(int argc, char* argv[])
 
 			if (TranslatorMessage::Vanished == msgType || TranslatorMessage::Obsolete == msgType)
 				continue; // ignore
+
+			if (ignoreFinished && TranslatorMessage::Finished == msgType)
+				continue; // ignore finished
 
 			const QString src = msg.sourceText();
 			if (dict.contains(src)) {
