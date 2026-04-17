@@ -42,16 +42,16 @@ int main(int argc, char* argv[])
 	parser.addHelpOption();
 
 	QCommandLineOption inputTsFileOption("ts", "TS file for input", "TS_FILE");
-	QCommandLineOption txtOption("txt", "Txt file for save/load as dict", "TXT_FILE");
 	QCommandLineOption outputTsFileOption("ts-out", "TS file for output", "TS_FILE");
+	QCommandLineOption dictTxtOption("txt", "Txt file for save/load as dict", "TXT_FILE");
 
 	parser.addOption(inputTsFileOption);
-	parser.addOption(txtOption);
 	parser.addOption(outputTsFileOption);
+	parser.addOption(dictTxtOption);
 
 	parser.process(app);
 	if (!parser.isSet(inputTsFileOption)) {
-		qCritical("You need to specify the ts file");
+		qCritical("You need to specify the input ts file");
 		return 1;
 	}
 
@@ -72,13 +72,13 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
-	if (!parser.isSet(txtOption)) {
+	if (!parser.isSet(dictTxtOption)) {
 		qCritical("You need to specify the txt file to save/load as dictionary");
 		return 1;
 	}
 
-	const QString txtFilepath  = parser.value(txtOption);
-	const int     messageCount = translator.messageCount();
+	const QString dictTxtFilepath = parser.value(dictTxtOption);
+	const int     messageCount    = translator.messageCount();
 
 	QMap<QString, int> srcToTxtFileLineNum;
 	QStringList        srcParsedTexts;
@@ -114,8 +114,8 @@ int main(int argc, char* argv[])
 
 	if (!parser.isSet(outputTsFileOption)) {
 		// txt已存在
-		if (QFileInfo(txtFilepath).isFile()) {
-			qInfo("Are you sure to overwrite %s? (y/n)", qPrintable(txtFilepath));
+		if (QFileInfo(dictTxtFilepath).isFile()) {
+			qInfo("Are you sure to overwrite %s? (y/n)", qPrintable(dictTxtFilepath));
 
 			QTextStream in(stdin);
 			if (in.readLine() != "y") {
@@ -125,9 +125,9 @@ int main(int argc, char* argv[])
 		}
 
 		// 生成txt
-		QFile file(txtFilepath);
+		QFile file(dictTxtFilepath);
 		if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
-			qCritical("Can not open %s", qPrintable(txtFilepath));
+			qCritical("Can not open %s", qPrintable(dictTxtFilepath));
 			return 1;
 		}
 
@@ -137,15 +137,15 @@ int main(int argc, char* argv[])
 		for (const QString& s : qAsConst(srcParsedTexts))
 			textStream << s << Qt::endl;
 
-		qDebug("Line count=%d, saved to %s", srcParsedTexts.count(), qPrintable(txtFilepath));
+		qDebug("Line count=%d, saved to %s", srcParsedTexts.count(), qPrintable(dictTxtFilepath));
 	} else {
 		// 输出新的ts文件
 		QMap<QString, QString> dict;
 		Q_ASSERT(srcParsedTexts.count() == srcTexts.count());
 
-		QFile file(txtFilepath);
+		QFile file(dictTxtFilepath);
 		if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-			qCritical("Can not open %s", qPrintable(txtFilepath));
+			qCritical("Can not open %s", qPrintable(dictTxtFilepath));
 			return 1;
 		}
 
