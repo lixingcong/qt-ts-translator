@@ -18,10 +18,22 @@
 
 #include <QCommandLineParser>
 #include <QCommandLineOption>
+#include <QRegularExpression>
 
 #include "qt-linguist-shared/translator.h"
 
-using StrMap = QMap<QString, QString>; // source -> translated
+static const QString EMOJI_NEWLINE = "🏮";
+
+static inline void removeNewLine(QString& s)
+{
+	static const QRegularExpression re("\r?\n");
+	s.replace(re, EMOJI_NEWLINE);
+}
+
+static inline void restoreNewLine(QString& s)
+{
+	s.replace(EMOJI_NEWLINE, "\n");
+}
 
 int main(int argc, char* argv[])
 {
@@ -65,7 +77,8 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
-	const QString txtFilepath = parser.value(txtOption);
+	const QString txtFilepath  = parser.value(txtOption);
+	const int     messageCount = translator.messageCount();
 
 	if (!parser.isSet(outputTsFileOption)) {
 		// txt已存在
@@ -89,8 +102,8 @@ int main(int argc, char* argv[])
 		}
 
 		QTextStream textStream(&file);
+		textStream.setCodec("UTF-8");
 
-		const int messageCount = translator.messageCount();
 		for (int i = 0; i < messageCount; ++i) {
 			const TranslatorMessage&      msg     = translator.message(i);
 			const TranslatorMessage::Type msgType = msg.type();
@@ -99,18 +112,42 @@ int main(int argc, char* argv[])
 				continue; // ignore
 
 			const QString src = msg.sourceText();
-			if (!sourceTextSet.contains(src)) {
-				sourceTextSet.insert(src);
-				textStream << src << Qt::endl;
+
+			QString parsedSrc(src);
+			removeNewLine(parsedSrc);
+
+#if 0
+			if (src.contains("\n")) {
+				qDebug("src contains newline");
 			}
+#endif
+
+			if (!sourceTextSet.contains(parsedSrc)) {
+				sourceTextSet.insert(parsedSrc);
+				textStream << parsedSrc << Qt::endl;
+			}
+
+
 		}
 
 		// translator.message(0).setTranslation("FUCK");
 		// translator.save("/tmp/app_ja-11111.ts", cd, "ts");
-		qDebug("Saved to %s", qPrintable(txtFilepath));
+		qDebug("Saved to %s", qPrintable(txtFilepath));\
 		return 0;
-	}else{
+	} else {
 		// 输出新的ts文件
+		QMap<QString, QString> dict;
+
+		{
+			QFile file(txtFilepath);
+			if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+				qCritical("Can not open %s", qPrintable(txtFilepath));
+				return 1;
+			}
+
+			QTextStream textStream(&file);
+			textStream.setCodec("UTF-8");
+		}
 	}
 
 	return 0;
