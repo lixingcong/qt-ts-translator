@@ -92,8 +92,13 @@ int main(int argc, char* argv[])
 
 		const int messageCount = translator.messageCount();
 		for (int i = 0; i < messageCount; ++i) {
-			const TranslatorMessage& msg = translator.message(i);
-			const QString            src = msg.sourceText();
+			const TranslatorMessage&      msg     = translator.message(i);
+			const TranslatorMessage::Type msgType = msg.type();
+
+			if (TranslatorMessage::Vanished == msgType || TranslatorMessage::Obsolete == msgType)
+				continue; // ignore
+
+			const QString src = msg.sourceText();
 			if (!sourceTextSet.contains(src)) {
 				sourceTextSet.insert(src);
 				textStream << src << Qt::endl;
