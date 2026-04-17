@@ -137,7 +137,7 @@ int main(int argc, char* argv[])
 		for (const QString& s : qAsConst(srcParsedTexts))
 			textStream << s << Qt::endl;
 
-		qDebug("Saved to %s", qPrintable(txtFilepath));
+		qDebug("Line count=%d, saved to %s", srcParsedTexts.count(), qPrintable(txtFilepath));
 	} else {
 		// 输出新的ts文件
 		QMap<QString, QString> dict;
@@ -164,6 +164,7 @@ int main(int argc, char* argv[])
 			dict[*(itSrc++)] = parsedTranslated;
 		}
 
+		int updatedCount = 0;
 		for (int i = 0; i < messageCount; ++i) {
 			TranslatorMessage&            msg     = translator.message(i);
 			const TranslatorMessage::Type msgType = msg.type();
@@ -179,6 +180,7 @@ int main(int argc, char* argv[])
 				if (translatedTxt != src && translatedTxt != translatedTs) { // not translate yet
 					msg.setTranslation(translatedTxt);
 					msg.setType(TranslatorMessage::Finished);
+					++updatedCount;
 				}
 			}
 		}
@@ -186,7 +188,7 @@ int main(int argc, char* argv[])
 		const QString tsOutputFilepath = parser.value(outputTsFileOption);
 		const bool    saved            = translator.save(tsOutputFilepath, cd, "ts");
 
-		qInfo("Save to %s %s", qPrintable(tsOutputFilepath), (saved ? "OK" : "Failed"));
+		qInfo("Updated %d items. Save to %s %s", updatedCount, qPrintable(tsOutputFilepath), (saved ? "OK" : "Failed"));
 	}
 
 	return 0;
