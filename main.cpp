@@ -80,30 +80,12 @@ int main(int argc, char* argv[])
 	const QString txtFilepath  = parser.value(txtOption);
 	const int     messageCount = translator.messageCount();
 
-	if (!parser.isSet(outputTsFileOption)) {
-		// txt已存在
-		if (QFileInfo(txtFilepath).isFile()) {
-			qInfo("Are you sure to overwrite %s? (y/n)", qPrintable(txtFilepath));
+	QMap<QString, int> srcToTxtFileLineNum;
+	QStringList        srcParsedTexts;
+	QStringList        srcTexts;
 
-			QTextStream in(stdin);
-			if (in.readLine() != "y") {
-				qInfo("You choose not to overwrite");
-				return 0;
-			}
-		}
-
-		// 生成txt
-		QSet<QString> sourceTextSet;
-
-		QFile file(txtFilepath);
-		if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
-			qCritical("Can not open %s", qPrintable(txtFilepath));
-			return 1;
-		}
-
-		QTextStream textStream(&file);
-		textStream.setCodec("UTF-8");
-
+	{
+		// 生成ts字典
 		for (int i = 0; i < messageCount; ++i) {
 			const TranslatorMessage&      msg     = translator.message(i);
 			const TranslatorMessage::Type msgType = msg.type();
@@ -122,32 +104,89 @@ int main(int argc, char* argv[])
 			}
 #endif
 
-			if (!sourceTextSet.contains(parsedSrc)) {
-				sourceTextSet.insert(parsedSrc);
-				textStream << parsedSrc << Qt::endl;
+			if (!srcToTxtFileLineNum.contains(parsedSrc)) {
+				srcToTxtFileLineNum[parsedSrc] = srcTexts.count();
+				srcParsedTexts << parsedSrc;
+				srcTexts << src;
 			}
+		}
+	}
 
+	if (!parser.isSet(outputTsFileOption)) {
+		// txt已存在
+		if (QFileInfo(txtFilepath).isFile()) {
+			qInfo("Are you sure to overwrite %s? (y/n)", qPrintable(txtFilepath));
 
+			QTextStream in(stdin);
+			if (in.readLine() != "y") {
+				qInfo("You choose not to overwrite");
+				return 0;
+			}
 		}
 
-		// translator.message(0).setTranslation("FUCK");
-		// translator.save("/tmp/app_ja-11111.ts", cd, "ts");
-		qDebug("Saved to %s", qPrintable(txtFilepath));\
-		return 0;
+		// 生成txt
+		QFile file(txtFilepath);
+		if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
+			qCritical("Can not open %s", qPrintable(txtFilepath));
+			return 1;
+		}
+
+		QTextStream textStream(&file);
+		textStream.setCodec("UTF-8");
+
+		for (const QString& s : qAsConst(srcParsedTexts))
+			textStream << s << Qt::endl;
+
+		qDebug("Saved to %s", qPrintable(txtFilepath));
 	} else {
 		// 输出新的ts文件
 		QMap<QString, QString> dict;
+		Q_ASSERT(srcParsedTexts.count() == srcTexts.count());
 
-		{
-			QFile file(txtFilepath);
-			if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-				qCritical("Can not open %s", qPrintable(txtFilepath));
-				return 1;
-			}
-
-			QTextStream textStream(&file);
-			textStream.setCodec("UTF-8");
+		QFile file(txtFilepath);
+		if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+			qCritical("Can not open %s", qPrintable(txtFilepath));
+			return 1;
 		}
+
+		QTextStream textStream(&file);
+		textStream.setCodec("UTF-8");
+
+		auto itSrc    = srcTexts.constBegin();
+		auto itSrcEnd = srcTexts.constEnd();
+
+		while (!textStream.atEnd() && itSrc != itSrcEnd) {
+			const QString translated = textStream.readLine();
+			QString       parsedTranslated(translated);
+			restoreNewLine(parsedTranslated);
+
+			//qDebug() << parsedTranslated;
+			dict[*(itSrc++)] = parsedTranslated;
+		}
+
+		for (int i = 0; i < messageCount; ++i) {
+			TranslatorMessage&            msg     = translator.message(i);
+			const TranslatorMessage::Type msgType = msg.type();
+
+			if (TranslatorMessage::Vanished == msgType || TranslatorMessage::Obsolete == msgType)
+				continue; // ignore
+
+			const QString src = msg.sourceText();
+			if (dict.contains(src)) {
+				const QString translatedTxt = dict.value(src);
+				const QString translatedTs  = msg.translation();
+
+				if (translatedTxt != src && translatedTxt != translatedTs) { // not translate yet
+					msg.setTranslation(translatedTxt);
+					msg.setType(TranslatorMessage::Finished);
+				}
+			}
+		}
+
+		const QString tsOutputFilepath = parser.value(outputTsFileOption);
+		const bool    saved            = translator.save(tsOutputFilepath, cd, "ts");
+
+		qInfo("Save to %s %s", qPrintable(tsOutputFilepath), (saved ? "OK" : "Failed"));
 	}
 
 	return 0;
