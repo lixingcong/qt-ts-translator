@@ -23,3 +23,10 @@ target_link_libraries(${LIB_NAME} PUBLIC Qt${QT_VERSION_MAJOR}::Xml)
 # app
 add_executable(${BIN_NAME} main.cpp)
 target_link_libraries(${BIN_NAME} PUBLIC ${LIB_NAME})
+
+# demo
+option(BuildDemo "Bulid demo for switch between languages" OFF)
+if(BuildDemo)
+	add_subdirectory(demo)
+endif()
+

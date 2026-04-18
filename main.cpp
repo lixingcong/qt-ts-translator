@@ -88,16 +88,23 @@ int main(int argc, char* argv[])
 	QStringList        srcTexts;
 
 	{
+		QMap<TranslatorMessage::Type, int> msgTypeCounter;
+
 		// 生成ts字典
 		for (int i = 0; i < messageCount; ++i) {
 			const TranslatorMessage&      msg     = translator.message(i);
 			const TranslatorMessage::Type msgType = msg.type();
 
-			if (TranslatorMessage::Vanished == msgType || TranslatorMessage::Obsolete == msgType)
-				continue; // ignore invalid
+#define CHECK_TYPE(tt, ignore) \
+			msgTypeCounter[msgType]++; \
+			if (ignore && msgType == tt) continue
 
-			if (ignoreFinished && TranslatorMessage::Finished == msgType)
-				continue; // ignore finished
+			CHECK_TYPE(TranslatorMessage::Vanished, true);
+			CHECK_TYPE(TranslatorMessage::Obsolete, true);
+			CHECK_TYPE(TranslatorMessage::Finished, ignoreFinished);
+			CHECK_TYPE(TranslatorMessage::Unfinished, false);
+
+#undef CHECK_TYPE
 
 			const QString src = msg.sourceText();
 
@@ -116,6 +123,11 @@ int main(int argc, char* argv[])
 				srcTexts << src;
 			}
 		}
+
+		qInfo("ignored vanished:   %d", msgTypeCounter.value(TranslatorMessage::Vanished));
+		qInfo("ignored obsolete:   %d", msgTypeCounter.value(TranslatorMessage::Obsolete));
+		qInfo("        unfinished: %d", msgTypeCounter.value(TranslatorMessage::Unfinished));
+		qInfo("%s finished:   %d", (ignoreFinished? "ignored": "       "), msgTypeCounter.value(TranslatorMessage::Finished));
 	}
 
 	if (!parser.isSet(outputTsFileOption)) {
