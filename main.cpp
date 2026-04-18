@@ -57,20 +57,20 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
-	const QString tsFilepath = parser.value(inputTsFileOption);
+	const QString inputTsFilepath = parser.value(inputTsFileOption);
 
 	Translator     translator;
 	ConversionData cd;
 
 	if (translator.registeredFileFormats().isEmpty()) {
-		qCritical("No registered file formats");
+		qCritical("Translator has no registered file formats");
 		return 1;
 	}
 
-	if (translator.load(tsFilepath, cd, "ts")) {
-		qDebug() << "loaded languageCode=" << translator.languageCode() << "messageCount=" << translator.messageCount();
+	if (translator.load(inputTsFilepath, cd, "ts")) {
+		qDebug().noquote() << inputTsFilepath << "is loaded, languageCode=" << translator.languageCode() << "messageCount=" << translator.messageCount();
 	} else {
-		qCritical("Can not load %s", qPrintable(tsFilepath));
+		qCritical("Can not load %s", qPrintable(inputTsFilepath));
 		return 1;
 	}
 
