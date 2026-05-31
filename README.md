@@ -8,13 +8,15 @@ A simple tool to modify `*.ts` translation file for Qt. With the help of online 
 
 Step 1: Load your ts file
 
-Step 2：Click "Export Template" button to generate a pure text file for translation. Every line in this file is the source text XXX. The XXX is `tr("XXX")` in you Qt project. It will ignore the context.
+Step 2: Click "Export Template" button to generate a pure text file for translation. Every line in this file is the source text XXX. The XXX is `tr("XXX")` in you Qt project. It will ignore the context.
 
 > In the template.txt, the newline will be replace by a special red emoji. You should not delete it. It will be replace to original newline when importing.
 
-Step 3: Use your own translate tool like [Google Translate](https://translate.google.com) to process the template.txt. You must keep the same line count with original template.txt.
+Step 3: Use your own translate tool like [Google Translate](https://translate.google.com) to process the template.txt. Load the translated.txt to the tool.
 
-Step 4，Load your translated.txt, Click "Save TS" and overwrite the original ts file.
+> You must keep the same line count with the row count of the dict table.
+
+Step 4: Load your translated.txt, Click "Save TS" and overwrite the original ts file.
 
 ## Fixed dictionary
 
@@ -28,4 +30,4 @@ Step 3: Save TS file.
 
 ## Qt Linguist
 
-Some out-of-date version of Linguist could not show the correct order of `tr(xx)`, you may need [Community linguist](https://github.com/thurask/Qt-Linguist).
+Some out-of-date version of Linguist could not show the correct order of `tr(xx)`, you may try [Community linguist](https://github.com/thurask/Qt-Linguist).

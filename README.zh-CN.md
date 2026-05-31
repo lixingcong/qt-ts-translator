@@ -12,7 +12,9 @@ Select Language: [English](README.md) | [简体中文](README.zh-CN.md)
 
 > 该纯文本中，每一个回车符会替换成一个红色的emoji，注意保留该特殊符号，最终会进行逆操作替换回原回车符。
 
-第三步，将该纯文本拖入翻译软件（可能需要转docx格式），如[Google Translate](https://translate.google.com)，翻译后得到translated.txt，该文件总行数需要与dict表格行数一致。
+第三步，将该纯文本拖入翻译软件（可能需要转docx格式），如[Google Translate](https://translate.google.com)，翻译后得到translated.txt，加载该文件。
+
+> 该文件总行数需要与dict表格行数一致。
 
 第四步，点击"Save"应用翻译，此时会覆盖源ts文件
 
