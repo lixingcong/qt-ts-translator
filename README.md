@@ -1,21 +1,25 @@
 # Qt半自动翻译
 
-第一步，从ts文件生成txt文件，该纯文本每行内容，是`tr("xx")`中的xx，并且忽略上下文
+## 简易步骤
 
-```bash
-./app --ts app.ts --txt src.txt
-```
+第一步，打开ts文件，加载已有的字典
+
+第二步：点击"Export Template"按钮，从ts文件生成txt文件，该纯文本每行内容，是`tr("xx")`中的xx，并且忽略上下文
 
 > 该纯文本中，每一个回车符会替换成一个红色的emoji，注意保留该特殊符号，最终会进行逆操作替换回原回车符。
 
-第二步，将该纯文本拖入翻译软件，如Google Translate Web，翻译后得到translated.txt
+第三步，将该纯文本拖入翻译软件（可能需要转docx格式），如[Google Translate](https://translate.google.com)，翻译后得到translated.txt，该文件总行数需要与dict表格行数一致。
 
-第三步，应用翻译
+第四步，点击"Save"应用翻译，此时会覆盖源ts文件
 
-```bash
-./app --ts app.ts --txt translated.txt --ts-out app_translated.ts
-```
+## 固定翻译
 
-# 语言家
+有些翻译需要精确的人工翻译，或者特定的缩写术语，不能被自动翻译。此时可以使用"Fixed dict"功能
+
+将dict表格中的某N行选中，右键菜单中添加到fixed dict。此时下方表格是可以编辑的。并且可以保存为json文件作为固定翻译。
+
+重新做一遍简易步骤，即可导出自动翻译+人工固定翻译的ts文件
+
+## 语言家
 
 Qt5的老旧版本，没有按tr()顺序显示词语，可以使用较新的版本。如网友[单独编译的语言家](https://github.com/thurask/Qt-Linguist)
