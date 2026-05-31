@@ -16,6 +16,8 @@ class QLineEdit;
 class QTableWidget;
 class QCheckBox;
 class TSManager;
+class FixedDictManager;
+class QComboBox;
 
 class MainWindow : public QWidget
 {
@@ -37,6 +39,9 @@ protected Q_SLOTS:
 	void onClickedLoadFixedDict();
 	void onClickedSaveFixedDit();
 
+	void onClickedAddLanguage();
+	void onClickedRemoveLanguage();
+
 	void onToggledIgnore();
 
 	void reloadTsTable();
@@ -47,12 +52,15 @@ protected Q_SLOTS:
 	void clearFixedDict();
 
 	void onFixedDictCellChanged(int row, int col);
+	void onSwitchToLanguage(const QString& lang);
 
 protected:
 	bool eventFilter(QObject* watched, QEvent* event) override;
 
 	void setDictRow(int row, int itemType, const QString& src, const QString& translation);
 	void setFixedDictRow(int row, const QString& src, const QString& translation);
+
+	QString currentLanguage() const;
 
 protected:
 	QTableWidget* const m_tableWidgetDict;
@@ -65,7 +73,10 @@ protected:
 	QCheckBox* const m_checkBoxIgnoreFinished;
 	QCheckBox* const m_checkBoxIgnoreVanishedObsolete;
 
-	QMap<QString, QString> m_fixedDict; // 固定翻译
+	QComboBox* const m_comboBoxFixedDictLanguage;
+
+	FixedDictManager* const m_fixedDictManager; // 固定翻译
+	QMap<QString, QString>  m_fixedDict;
 
 	QScopedPointer<TSManager> m_tsManager;
 };

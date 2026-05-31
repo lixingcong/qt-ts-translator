@@ -30,8 +30,11 @@
 #include <QMenu>
 #include <QCursor>
 #include <QContextMenuEvent>
+#include <QComboBox>
+#include <QInputDialog>
 
 #include "TSManager.h"
+#include "FixedDictManager.h"
 #include "Utils.h"
 
 namespace
@@ -51,6 +54,8 @@ MainWindow::MainWindow(QWidget* parent)
     , m_lineEditOnlineDict(new QLineEdit)
     , m_checkBoxIgnoreFinished(new QCheckBox("Ignore Finished"))
     , m_checkBoxIgnoreVanishedObsolete(new QCheckBox("Ignore Obsolete"))
+    , m_comboBoxFixedDictLanguage(new QComboBox)
+    , m_fixedDictManager(new FixedDictManager)
 {
 	auto mainLayout = new QVBoxLayout(this);
 
@@ -164,14 +169,40 @@ MainWindow::MainWindow(QWidget* parent)
 
 	{
 		auto groupBox = new QGroupBox("Custom Fixed Dictionary(Editable)");
-		auto l        = new QHBoxLayout(groupBox);
+		auto l        = new QVBoxLayout(groupBox);
+
+		{
+			auto btnLayout = new QHBoxLayout;
+			btnLayout->setMargin(0);
+			l->addLayout(btnLayout);
+
+			auto btnAdd    = new QPushButton("Add Lang");
+			auto btnRemove = new QPushButton("Remove Lang");
+
+			btnLayout->addWidget(new QLabel("Language"));
+			btnLayout->addWidget(m_comboBoxFixedDictLanguage);
+			btnLayout->addWidget(btnAdd);
+			btnLayout->addWidget(btnRemove);
+			btnLayout->addStretch();
+
+			m_comboBoxFixedDictLanguage->addItem(m_fixedDictManager->defaultLanguage());
+			onSwitchToLanguage(m_fixedDictManager->defaultLanguage());
+
+			connect(m_comboBoxFixedDictLanguage, &QComboBox::currentTextChanged, this, &MainWindow::onSwitchToLanguage);
+			connect(btnAdd, &QPushButton::clicked, this, &MainWindow::onClickedAddLanguage);
+			connect(btnRemove, &QPushButton::clicked, this, &MainWindow::onClickedRemoveLanguage);
+		}
+
 		l->addWidget(m_tableWidgetFixedDict);
 
 		m_tableWidgetFixedDict->setAlternatingRowColors(true);
 		m_tableWidgetFixedDict->verticalHeader()->hide();
 		m_tableWidgetFixedDict->setColumnCount(3);
 		m_tableWidgetFixedDict->setHorizontalHeaderLabels({"Valid", "Source", "Translation"});
+		m_tableWidgetFixedDict->setSelectionBehavior(QAbstractItemView::SelectRows);
+		m_tableWidgetFixedDict->setSelectionMode(QAbstractItemView::ContiguousSelection);
 		m_tableWidgetFixedDict->installEventFilter(this);
+
 		connect(m_tableWidgetFixedDict, &QTableWidget::cellChanged, this, &MainWindow::onFixedDictCellChanged);
 
 		QHeaderView* horizontalHeader= m_tableWidgetFixedDict->horizontalHeader();
@@ -200,6 +231,8 @@ MainWindow::~MainWindow()
 	settings.setValue(KEY_SRC_TS, m_lineEditSourceTS->text());
 	settings.setValue(KEY_ONLINE_DICT, m_lineEditOnlineDict->text());
 	settings.setValue(KEY_FIXED_DICT, m_lineEditFixedDict->text());
+
+	delete m_fixedDictManager;
 }
 
 void MainWindow::onClickedBrowseTs()
@@ -230,7 +263,12 @@ void MainWindow::onClickedSaveTs()
 {
 	if (!m_tsManager || !m_tsManager->save()) {
 		QMessageBox::warning(this, QString(), "Failed to save TS: file is not opened yet");
+		return;
 	}
+
+	if (QMessageBox::No
+	    == QMessageBox::question(this, QString(), QString("Are you sure to overwrite %1?").arg(m_tsManager->filepath()), QMessageBox::Yes | QMessageBox::No))
+		return;
 
 	QMap<QString, QString> dict;
 
@@ -246,8 +284,10 @@ void MainWindow::onClickedSaveTs()
 	}
 
 	m_tsManager->setTranslations(dict);
-	if (!m_tsManager->save()) {
-		QMessageBox::critical(this, QString(), QString("Failed to save ts to %1").arg(m_tsManager->filepath()));
+	if (m_tsManager->save()) {
+		QMessageBox::information(this, QString(), "Saved");
+	}else{
+		QMessageBox::critical(this, QString(), QString("Failed to save"));
 	}
 }
 
@@ -330,7 +370,9 @@ void MainWindow::onClickedLoadFixedDict()
 {
 	m_tableWidgetFixedDict->clearContents();
 	m_tableWidgetFixedDict->setRowCount(0);
-	m_fixedDict.clear();
+
+	m_fixedDictManager->reset();
+	m_fixedDict = m_fixedDictManager->dict(currentLanguage());
 
 	QString filepath = m_lineEditFixedDict->text();
 	if (filepath.isEmpty())
@@ -349,28 +391,14 @@ void MainWindow::onClickedLoadFixedDict()
 		return;
 	}
 
-	const QJsonObject j              = jDoc.object();
-	const QJsonArray  fixedDictArray = j.value(KEY_FIXED_DICT).toArray();
+	const QJsonObject j = jDoc.object();
 
-	int row = 0;
-	for (const QJsonValue& jv : fixedDictArray) {
-		const QJsonArray arr = jv.toArray();
-		if (arr.count() >= 2) {
-			const QString src         = arr.at(0).toString();
-			const QString translation = arr.at(1).toString();
-			if (src.isEmpty() || m_fixedDict.contains(src))
-				continue;
-
-			m_tableWidgetFixedDict->setRowCount(row + 1);
-			setFixedDictRow(row, src, translation);
-			m_fixedDict[src] = translation;
-
-			++row;
-		}
-	}
+	m_fixedDictManager->load(j.value(KEY_FIXED_DICT).toObject());
+	m_fixedDict = m_fixedDictManager->dict(currentLanguage());
+	m_comboBoxFixedDictLanguage->clear();
+	m_comboBoxFixedDictLanguage->addItems(m_fixedDictManager->languages());
 
 	reloadTsTable();
-	refreshFixedDictValid();
 }
 
 void MainWindow::onClickedSaveFixedDit()
@@ -381,6 +409,10 @@ void MainWindow::onClickedSaveFixedDit()
 		if (filepath.isEmpty()) // still invalid
 			return;
 		m_lineEditFixedDict->setText(filepath);
+	} else {
+		if (QMessageBox::No
+		    == QMessageBox::question(this, QString(), QString("Are you sure to overwrite %1?").arg(filepath), QMessageBox::Yes | QMessageBox::No))
+			return;
 	}
 
 	QFile file(filepath);
@@ -389,19 +421,52 @@ void MainWindow::onClickedSaveFixedDit()
 		return;
 	}
 
-	QJsonArray fixedDictArray;
+	QJsonObject jFixedDict;
+	m_fixedDictManager->save(&jFixedDict);
 
-	const int TableRowCount = m_tableWidgetFixedDict->rowCount();
-	for (int row = 0; row < TableRowCount; ++row) {
-		const QString    src         = m_tableWidgetFixedDict->item(row, 1)->text();
-		const QString    translation = m_tableWidgetFixedDict->item(row, 2)->text();
-		const QJsonArray arr         = QJsonArray::fromStringList({src, translation});
-		fixedDictArray << arr;
+	const QJsonObject j{{KEY_FIXED_DICT, jFixedDict}};
+
+	if (file.write(QJsonDocument(j).toJson())) {
+		QMessageBox::information(this, QString(), "Saved");
+	} else {
+		QMessageBox::critical(this, QString(), QString("Failed to save to %1").arg(filepath));
 	}
+}
 
-	const QJsonObject j{{KEY_FIXED_DICT, fixedDictArray}};
+void MainWindow::onClickedAddLanguage()
+{
+	const QString newLang = QInputDialog::getText(this, QString(), "Input the new language");
+	if (newLang.isEmpty())
+		return;
 
-	file.write(QJsonDocument(j).toJson());
+	if (m_fixedDictManager->addLanguage(newLang)) {
+		m_fixedDict = m_fixedDictManager->dict(newLang);
+
+		const int RowCount = m_comboBoxFixedDictLanguage->count();
+		m_comboBoxFixedDictLanguage->addItem(newLang);
+		m_comboBoxFixedDictLanguage->setCurrentIndex(RowCount);
+	} else {
+		QMessageBox::warning(this, QString(), "Failed to add language");
+	}
+}
+
+void MainWindow::onClickedRemoveLanguage()
+{
+	const QString lang = m_comboBoxFixedDictLanguage->currentText();
+
+	if (QMessageBox::No
+	    == QMessageBox::question(this,
+	                             QString(),
+	                             QString("Are you sure to remove language: %1?\nThis operation cannot be undone.").arg(lang),
+	                             QMessageBox::Yes | QMessageBox::No))
+		return;
+
+	if (m_fixedDictManager->removeLanguage(lang)) {
+		m_fixedDict = m_fixedDictManager->dict(currentLanguage());
+
+		const int idx = m_comboBoxFixedDictLanguage->currentIndex();
+		m_comboBoxFixedDictLanguage->removeItem(idx);
+	}
 }
 
 void MainWindow::onToggledIgnore()
@@ -484,6 +549,8 @@ void MainWindow::moveDictToFixed()
 		const int TableRowCount = m_tableWidgetFixedDict->rowCount();
 		m_tableWidgetFixedDict->setRowCount(TableRowCount + 1);
 		setFixedDictRow(TableRowCount, src, translation);
+
+		m_fixedDictManager->setTransaltion(currentLanguage(), src, translation);
 		m_fixedDict[src] = translation;
 
 		m_tableWidgetDict->removeRow(top);
@@ -529,7 +596,9 @@ void MainWindow::moveFixedToDict()
 		m_tableWidgetDict->setRowCount(TableRowCount + 1);
 		setDictRow(TableRowCount, tsItem.type, src, tsItem.translation);
 
+		m_fixedDictManager->removeSrc(src);
 		m_fixedDict.remove(src);
+
 		m_tableWidgetFixedDict->removeRow(top);
 	}
 }
@@ -538,7 +607,9 @@ void MainWindow::clearFixedDict()
 {
 	m_tableWidgetFixedDict->clearContents();
 	m_tableWidgetFixedDict->setRowCount(0);
-	m_fixedDict.clear();
+
+	m_fixedDictManager->reset();
+	m_fixedDict = m_fixedDictManager->dict(currentLanguage());
 
 	reloadTsTable();
 }
@@ -551,10 +622,33 @@ void MainWindow::onFixedDictCellChanged(int row, int col)
 			return;
 
 		const QString transaltion = m_tableWidgetFixedDict->item(row, 2)->text();
+		m_fixedDictManager->setTransaltion(currentLanguage(), src, transaltion);
 		m_fixedDict[src]          = transaltion;
 
 		//qDebug("change fixed: (%s) => (%s)", qPrintable(src), qPrintable(transaltion));
 	}
+}
+
+void MainWindow::onSwitchToLanguage(const QString& lang)
+{
+	qDebug("onSwitchToLanguage=%s", qPrintable(lang));
+	if (lang.isEmpty())
+		return;
+
+	m_fixedDict = m_fixedDictManager->dict(lang);
+
+	int row = 0;
+	for (auto it = m_fixedDict.constBegin(), itEnd = m_fixedDict.constEnd(); it != itEnd; ++it) {
+		const QString src         = it.key();
+		const QString translation = it.value();
+
+		m_tableWidgetFixedDict->setRowCount(row + 1);
+		setFixedDictRow(row, src, translation);
+
+		++row;
+	}
+
+	refreshFixedDictValid();
 }
 
 bool MainWindow::eventFilter(QObject* watched, QEvent* event)
@@ -615,4 +709,9 @@ void MainWindow::setFixedDictRow(int row, const QString& src, const QString& tra
 
 	col[1]->setText(src);
 	col[2]->setText(translation);
+}
+
+QString MainWindow::currentLanguage() const
+{
+	return m_comboBoxFixedDictLanguage->currentText();
 }

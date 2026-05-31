@@ -26,6 +26,7 @@ add_executable(${BIN_NAME}
 	MainWindow.h MainWindow.cpp
 	Utils.h Utils.cpp
 	TSManager.h TSManager.cpp
+	FixedDictManager.h FixedDictManager.cpp
 )
 target_link_libraries(${BIN_NAME} PUBLIC ${LIB_NAME})
 
