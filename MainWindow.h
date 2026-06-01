@@ -53,7 +53,9 @@ protected Q_SLOTS:
 	void moveDictToFixed();
 	void moveFixedToDict();
 	void forceMoveFixedToDict();
-	void clearFixedDict();
+	void copyDictSource();
+	void copyDictOldTranslation();
+	void copyFixedDictSource();
 
 	void onDictCellChanged(int row, int col);
 	void onFixedDictCellChanged(int row, int col);
@@ -66,6 +68,7 @@ protected:
 	void setFixedDictRow(int row, const QString& src, const QString& translation);
 
 	void removeSelectedFixedDict(bool forceDelete);
+	void copyTableWidgetCellText(QTableWidget* tableWidget, int srcCol);
 
 	QString currentLanguage() const;
 

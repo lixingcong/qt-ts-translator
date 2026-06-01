@@ -32,6 +32,8 @@
 #include <QContextMenuEvent>
 #include <QComboBox>
 #include <QInputDialog>
+#include <QClipboard>
+#include <QApplication>
 
 #include "TSManager.h"
 #include "FixedDictManager.h"
@@ -564,7 +566,7 @@ void MainWindow::moveDictToFixed()
 {
 	const auto srs = m_tableWidgetDict->selectedRanges();
 	if (srs.isEmpty()) {
-		QMessageBox::information(this, QString(), "Select more items and retry again");
+		QMessageBox::information(this, QString(), "Select more items and try again");
 		return;
 	}
 
@@ -606,11 +608,39 @@ void MainWindow::forceMoveFixedToDict()
 	removeSelectedFixedDict(true);
 }
 
+void MainWindow::copyDictSource()
+{
+	copyTableWidgetCellText(m_tableWidgetDict, DICT_COL_SRC);
+}
+
+void MainWindow::copyDictOldTranslation()
+{
+	copyTableWidgetCellText(m_tableWidgetDict, DICT_COL_OLD_TRANSLATION);
+}
+
+void MainWindow::copyFixedDictSource()
+{
+	copyTableWidgetCellText(m_tableWidgetFixedDict, FIXED_DICT_COL_SRC);
+}
+
+void MainWindow::copyTableWidgetCellText(QTableWidget* tableWidget, int srcCol)
+{
+	const auto srs = tableWidget->selectedRanges();
+	if (srs.count() != 1) {
+		QMessageBox::information(this, QString(), "Select only one item and try again");
+		return;
+	}
+
+	const int     row = srs.first().topRow();
+	const QString src = tableWidget->item(row, srcCol)->text();
+	QApplication::clipboard()->setText(src);
+}
+
 void MainWindow::removeSelectedFixedDict(bool forceDelete)
 {
 	const auto srs = m_tableWidgetFixedDict->selectedRanges();
 	if (srs.isEmpty()) {
-		QMessageBox::information(this, QString(), "Select more items and retry again");
+		QMessageBox::information(this, QString(), "Select more items and try again");
 		return;
 	}
 
@@ -653,17 +683,6 @@ void MainWindow::removeSelectedFixedDict(bool forceDelete)
 		m_fixedDict.remove(src);
 		m_tableWidgetFixedDict->removeRow(top);
 	}
-}
-
-void MainWindow::clearFixedDict()
-{
-	m_tableWidgetFixedDict->clearContents();
-	m_tableWidgetFixedDict->setRowCount(0);
-
-	m_fixedDictManager->reset();
-	m_fixedDict = m_fixedDictManager->dict(currentLanguage());
-
-	reloadTsTable();
 }
 
 void MainWindow::onDictCellChanged(int row, int col)
@@ -717,17 +736,27 @@ void MainWindow::onSwitchToLanguage(const QString& lang)
 
 bool MainWindow::eventFilter(QObject* watched, QEvent* event)
 {
-	if (m_useFixedDict && event->type() == QEvent::ContextMenu) {
+	if (event->type() == QEvent::ContextMenu) {
 		QContextMenuEvent* cmEvent = static_cast<QContextMenuEvent*>(event);
 
 		if (watched == m_tableWidgetDict) {
 			QMenu menu;
-			menu.addAction("Move rows to fixed dict", this, &MainWindow::moveDictToFixed);
+			if (m_useFixedDict) {
+				menu.addAction("Move rows to fixed dict", this, &MainWindow::moveDictToFixed);
+				menu.addSeparator();
+			}
+			menu.addAction("Copy source text", this, &MainWindow::copyDictSource);
+			menu.addAction("Copy old transaltion", this, &MainWindow::copyDictOldTranslation);
+
 			menu.exec(cmEvent->globalPos());
 		} else if (watched == m_tableWidgetFixedDict) {
 			QMenu menu;
-			menu.addAction("Move rows to dict", this, &MainWindow::moveFixedToDict);
-			menu.addAction("Move rows to dict and delete invalid", this, &MainWindow::forceMoveFixedToDict);
+			if (m_useFixedDict) {
+				menu.addAction("Move rows to dict", this, &MainWindow::moveFixedToDict);
+				menu.addAction("Move rows to dict and delete invalid", this, &MainWindow::forceMoveFixedToDict);
+				menu.addSeparator();
+			}
+			menu.addAction("Copy source text", this, &MainWindow::copyFixedDictSource);
 			menu.exec(cmEvent->globalPos());
 		}
 	}
