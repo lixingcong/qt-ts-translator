@@ -4,6 +4,8 @@ Select Language: [English](README.md) | [简体中文](README.zh-CN.md)
 
 一个简单的工具用于Qt的`*ts`文件，达到翻译不同语言的目的。借助网络翻译，可以节省时间。
 
+![](screenshot.png)
+
 ## 简易步骤
 
 第一步，打开ts文件，加载已有的字典

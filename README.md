@@ -4,6 +4,8 @@ Select Language: [English](README.md) | [简体中文](README.zh-CN.md)
 
 A simple tool to modify `*.ts` translation file for Qt. With the help of online translation, save your time.
 
+![](screenshot.png)
+
 ## Usage
 
 Step 1: Load your ts file
