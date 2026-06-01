@@ -598,6 +598,16 @@ void MainWindow::moveDictToFixed()
 
 void MainWindow::moveFixedToDict()
 {
+	removeSelectedFixedDict(false);
+}
+
+void MainWindow::forceMoveFixedToDict()
+{
+	removeSelectedFixedDict(true);
+}
+
+void MainWindow::removeSelectedFixedDict(bool forceDelete)
+{
 	const auto srs = m_tableWidgetFixedDict->selectedRanges();
 	if (srs.isEmpty()) {
 		QMessageBox::information(this, QString(), "Select more items and retry again");
@@ -624,7 +634,13 @@ void MainWindow::moveFixedToDict()
 		const QString src = m_tableWidgetFixedDict->item(top, FIXED_DICT_COL_SRC)->text();
 
 		if (!tsItems.contains(src)) {
-			++top; // skip
+			if (forceDelete) {
+				m_fixedDictManager->removeSrc(src);
+				m_fixedDict.remove(src);
+				m_tableWidgetFixedDict->removeRow(top);
+			} else {
+				++top; // skip
+			}
 			continue;
 		}
 
@@ -635,7 +651,6 @@ void MainWindow::moveFixedToDict()
 
 		m_fixedDictManager->removeSrc(src);
 		m_fixedDict.remove(src);
-
 		m_tableWidgetFixedDict->removeRow(top);
 	}
 }
@@ -712,7 +727,7 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
 		} else if (watched == m_tableWidgetFixedDict) {
 			QMenu menu;
 			menu.addAction("Move rows to dict", this, &MainWindow::moveFixedToDict);
-			menu.addAction("Clear all", this, &MainWindow::clearFixedDict);
+			menu.addAction("Move rows to dict and delete invalid", this, &MainWindow::forceMoveFixedToDict);
 			menu.exec(cmEvent->globalPos());
 		}
 	}

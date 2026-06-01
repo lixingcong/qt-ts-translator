@@ -31,3 +31,7 @@ Step 3: Save TS file.
 ## Qt Linguist
 
 Some out-of-date version of Linguist could not show the correct order of `tr(xx)`, you may try [Community linguist](https://github.com/thurask/Qt-Linguist).
+
+## TODO
+
+- [ ] Edit multi-line text in a cell of QTableWidget

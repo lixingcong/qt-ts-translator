@@ -52,6 +52,7 @@ protected Q_SLOTS:
 
 	void moveDictToFixed();
 	void moveFixedToDict();
+	void forceMoveFixedToDict();
 	void clearFixedDict();
 
 	void onDictCellChanged(int row, int col);
@@ -63,6 +64,8 @@ protected:
 
 	void setDictRow(int row, int itemType, const QString& src, const QString& oldTranslation, const QString& newTranslation);
 	void setFixedDictRow(int row, const QString& src, const QString& translation);
+
+	void removeSelectedFixedDict(bool forceDelete);
 
 	QString currentLanguage() const;
 
