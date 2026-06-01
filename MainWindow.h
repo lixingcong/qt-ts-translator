@@ -18,6 +18,8 @@ class QCheckBox;
 class TSManager;
 class FixedDictManager;
 class QComboBox;
+class QPushButton;
+class QGroupBox;
 
 class MainWindow : public QWidget
 {
@@ -43,6 +45,7 @@ protected Q_SLOTS:
 	void onClickedRemoveLanguage();
 
 	void onToggledIgnore();
+	void setUseFixedDict(bool b);
 
 	void reloadTsTable();
 	void refreshFixedDictValid(); // 只刷新第一列
@@ -51,13 +54,14 @@ protected Q_SLOTS:
 	void moveFixedToDict();
 	void clearFixedDict();
 
+	void onDictCellChanged(int row, int col);
 	void onFixedDictCellChanged(int row, int col);
 	void onSwitchToLanguage(const QString& lang);
 
 protected:
 	bool eventFilter(QObject* watched, QEvent* event) override;
 
-	void setDictRow(int row, int itemType, const QString& src, const QString& translation);
+	void setDictRow(int row, int itemType, const QString& src, const QString& oldTranslation, const QString& newTranslation);
 	void setFixedDictRow(int row, const QString& src, const QString& translation);
 
 	QString currentLanguage() const;
@@ -77,6 +81,14 @@ protected:
 
 	FixedDictManager* const m_fixedDictManager; // 固定翻译
 	QMap<QString, QString>  m_fixedDict;
+	bool                    m_useFixedDict;
+
+	QPushButton* const m_btnFixedDictBrowse;
+	QPushButton* const m_btnFixedDictLoad;
+	QPushButton* const m_btnFixedDictSave;
+	QGroupBox* const   m_groupBoxFixedDict;
 
 	QScopedPointer<TSManager> m_tsManager;
+
+	QMap<QString, QString> m_tableDict; // 这个仅保存用户在界面上手工修改过的翻译（包括从template.txt中加载的），用于刷新表格缓存，不用于真正翻译
 };

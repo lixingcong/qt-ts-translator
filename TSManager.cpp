@@ -80,9 +80,11 @@ void TSManager::setTranslations(const QMap<QString, QString>& dict)
 {
 	for (auto it = dict.constBegin(), itEnd = dict.constEnd(); it != itEnd; ++it) {
 		const QString src = it.key();
-		if (m_srcTextToItem.contains(src)) {
+		const QString translation = it.value();
+
+		if (m_srcTextToItem.contains(src) && !translation.isEmpty()) {
 			Item& item   = m_srcTextToItem[src];
-			item.translation = it.value();
+			item.translation = translation;
 			item.type        = Finished;
 
 			for(int idx: qAsConst(item.messageIndices)){

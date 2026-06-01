@@ -43,6 +43,18 @@ constexpr const char* CONFIG_FILE     = "config.ini";
 constexpr const char* KEY_SRC_TS      = "source_ts";
 constexpr const char* KEY_ONLINE_DICT = "dict_online";
 constexpr const char* KEY_FIXED_DICT  = "dict_fixed";
+
+// 表格的列
+constexpr int DICT_COLUMN_COUNT        = 4;
+constexpr int DICT_COL_STATUS          = 0;
+constexpr int DICT_COL_SRC             = 1;
+constexpr int DICT_COL_OLD_TRANSLATION = 2;
+constexpr int DICT_COL_NEW_TRANSLATION     = 3;
+
+constexpr int FIXED_DICT_COLUMN_COUNT    = 3;
+constexpr int FIXED_DICT_COL_VALID       = 0;
+constexpr int FIXED_DICT_COL_SRC         = 1;
+constexpr int FIXED_DICT_COL_TRANSLATION = 2;
 }
 
 MainWindow::MainWindow(QWidget* parent)
@@ -56,6 +68,11 @@ MainWindow::MainWindow(QWidget* parent)
     , m_checkBoxIgnoreVanishedObsolete(new QCheckBox("Ignore Obsolete"))
     , m_comboBoxFixedDictLanguage(new QComboBox)
     , m_fixedDictManager(new FixedDictManager)
+    , m_useFixedDict(false)
+    , m_btnFixedDictBrowse(new QPushButton("Browse"))
+    , m_btnFixedDictLoad(new QPushButton("Load"))
+    , m_btnFixedDictSave(new QPushButton("Save"))
+    , m_groupBoxFixedDict(new QGroupBox("Custom Fixed Dictionary(Editable)"))
 {
 	auto mainLayout = new QVBoxLayout(this);
 
@@ -89,21 +106,24 @@ MainWindow::MainWindow(QWidget* parent)
 		{
 			int col = 0;
 
-			auto btnBrowse = new QPushButton("Browse");
-			auto btnLoad   = new QPushButton("Load");
-			auto btnSave   = new QPushButton("Save");
-			gridLayout->addWidget(new QLabel("Custom Fixed Dictionary"), row, col++);
+			auto checkBox  = new QCheckBox("Custom Fixed Dictionary");
+			gridLayout->addWidget(checkBox, row, col++);
 			gridLayout->addWidget(m_lineEditFixedDict, row, col++);
 
 			m_lineEditFixedDict->setPlaceholderText("Json file");
 
-			gridLayout->addWidget(btnBrowse, row, col++);
-			gridLayout->addWidget(btnLoad, row, col++);
-			gridLayout->addWidget(btnSave, row, col++);
+			gridLayout->addWidget(m_btnFixedDictBrowse, row, col++);
+			gridLayout->addWidget(m_btnFixedDictLoad, row, col++);
+			gridLayout->addWidget(m_btnFixedDictSave, row, col++);
 
-			connect(btnBrowse, &QPushButton::clicked, this, &MainWindow::onClickedBrowseFixedDict);
-			connect(btnLoad, &QPushButton::clicked, this, &MainWindow::onClickedLoadFixedDict);
-			connect(btnSave, &QPushButton::clicked, this, &MainWindow::onClickedSaveFixedDit);
+			checkBox->setChecked(m_useFixedDict);
+			setUseFixedDict(checkBox->isChecked());
+
+			connect(checkBox, &QCheckBox::toggled, this, &MainWindow::setUseFixedDict);
+			connect(checkBox, &QCheckBox::toggled, this, &MainWindow::reloadTsTable);
+			connect(m_btnFixedDictBrowse, &QPushButton::clicked, this, &MainWindow::onClickedBrowseFixedDict);
+			connect(m_btnFixedDictLoad, &QPushButton::clicked, this, &MainWindow::onClickedLoadFixedDict);
+			connect(m_btnFixedDictSave, &QPushButton::clicked, this, &MainWindow::onClickedSaveFixedDit);
 
 			++row;
 		}
@@ -132,7 +152,7 @@ MainWindow::MainWindow(QWidget* parent)
 	}
 
 	{
-		auto groupBox = new QGroupBox("TS File(Edit is not allow)");
+		auto groupBox = new QGroupBox("TS File(New translation is editable)");
 		auto l        = new QVBoxLayout(groupBox);
 
 		{
@@ -152,24 +172,25 @@ MainWindow::MainWindow(QWidget* parent)
 
 		m_tableWidgetDict->setAlternatingRowColors(true);
 		m_tableWidgetDict->verticalHeader()->hide();
-		m_tableWidgetDict->setColumnCount(3);
-		m_tableWidgetDict->setHorizontalHeaderLabels({"Status", "Source", "Translation"});
+		m_tableWidgetDict->setColumnCount(DICT_COLUMN_COUNT);
+		m_tableWidgetDict->setHorizontalHeaderLabels({"Status", "Source", "Existed Translation", "New Translation"});
 		m_tableWidgetDict->setSelectionBehavior(QAbstractItemView::SelectRows);
 		m_tableWidgetDict->setSelectionMode(QAbstractItemView::ContiguousSelection);
-		m_tableWidgetDict->setEditTriggers(QAbstractItemView::NoEditTriggers);
 		m_tableWidgetDict->installEventFilter(this);
 
 		QHeaderView* horizontalHeader= m_tableWidgetDict->horizontalHeader();
-		horizontalHeader->setSectionResizeMode(0, QHeaderView::ResizeToContents);
-		horizontalHeader->setSectionResizeMode(1, QHeaderView::Stretch);
-		horizontalHeader->setSectionResizeMode(2, QHeaderView::Stretch);
+		horizontalHeader->setSectionResizeMode(DICT_COL_STATUS, QHeaderView::ResizeToContents);
+		horizontalHeader->setSectionResizeMode(DICT_COL_SRC, QHeaderView::Stretch);
+		horizontalHeader->setSectionResizeMode(DICT_COL_OLD_TRANSLATION, QHeaderView::Stretch);
+		horizontalHeader->setSectionResizeMode(DICT_COL_NEW_TRANSLATION, QHeaderView::Stretch);
+
+		connect(m_tableWidgetDict, &QTableWidget::cellChanged, this, &MainWindow::onDictCellChanged);
 
 		mainLayout->addWidget(groupBox);
 	}
 
 	{
-		auto groupBox = new QGroupBox("Custom Fixed Dictionary(Editable)");
-		auto l        = new QVBoxLayout(groupBox);
+		auto l = new QVBoxLayout(m_groupBoxFixedDict);
 
 		{
 			auto btnLayout = new QHBoxLayout;
@@ -197,7 +218,7 @@ MainWindow::MainWindow(QWidget* parent)
 
 		m_tableWidgetFixedDict->setAlternatingRowColors(true);
 		m_tableWidgetFixedDict->verticalHeader()->hide();
-		m_tableWidgetFixedDict->setColumnCount(3);
+		m_tableWidgetFixedDict->setColumnCount(FIXED_DICT_COLUMN_COUNT);
 		m_tableWidgetFixedDict->setHorizontalHeaderLabels({"Valid", "Source", "Translation"});
 		m_tableWidgetFixedDict->setSelectionBehavior(QAbstractItemView::SelectRows);
 		m_tableWidgetFixedDict->setSelectionMode(QAbstractItemView::ContiguousSelection);
@@ -206,11 +227,11 @@ MainWindow::MainWindow(QWidget* parent)
 		connect(m_tableWidgetFixedDict, &QTableWidget::cellChanged, this, &MainWindow::onFixedDictCellChanged);
 
 		QHeaderView* horizontalHeader= m_tableWidgetFixedDict->horizontalHeader();
-		horizontalHeader->setSectionResizeMode(0, QHeaderView::ResizeToContents);
-		horizontalHeader->setSectionResizeMode(1, QHeaderView::Stretch);
-		horizontalHeader->setSectionResizeMode(2, QHeaderView::Stretch);
+		horizontalHeader->setSectionResizeMode(FIXED_DICT_COL_VALID, QHeaderView::ResizeToContents);
+		horizontalHeader->setSectionResizeMode(FIXED_DICT_COL_SRC, QHeaderView::Stretch);
+		horizontalHeader->setSectionResizeMode(FIXED_DICT_COL_TRANSLATION, QHeaderView::Stretch);
 
-		mainLayout->addWidget(groupBox);
+		mainLayout->addWidget(m_groupBoxFixedDict);
 	}
 
 	{
@@ -251,6 +272,8 @@ void MainWindow::onClickedLoadTs()
 		return;
 
 	m_tsManager.reset(new TSManager(filepath));
+	m_tableDict.clear();
+
 	if (m_tsManager->load()) {
 		reloadTsTable();
 		refreshFixedDictValid();
@@ -274,17 +297,21 @@ void MainWindow::onClickedSaveTs()
 
 	const int TableRowCount = m_tableWidgetDict->rowCount();
 	for (int row = 0; row < TableRowCount; ++row) {
-		const QString src         = m_tableWidgetDict->item(row, 1)->text();
-		const QString translation = m_tableWidgetDict->item(row, 2)->text();
+		const QString src         = m_tableWidgetDict->item(row, DICT_COL_SRC)->text();
+		const QString translation = m_tableWidgetDict->item(row, DICT_COL_NEW_TRANSLATION)->text();
 		dict[src]                 = translation;
 	}
 
-	for (auto it = m_fixedDict.constBegin(), itEnd = m_fixedDict.constEnd(); it != itEnd; ++it) {
-		dict[it.key()] = it.value();
+	if (m_useFixedDict) {
+		for (auto it = m_fixedDict.constBegin(), itEnd = m_fixedDict.constEnd(); it != itEnd; ++it) {
+			dict[it.key()] = it.value();
+		}
 	}
 
 	m_tsManager->setTranslations(dict);
 	if (m_tsManager->save()) {
+		m_tableDict.clear(); // 已经保存了，完成使命
+		reloadTsTable();
 		QMessageBox::information(this, QString(), "Saved");
 	}else{
 		QMessageBox::critical(this, QString(), QString("Failed to save"));
@@ -326,10 +353,10 @@ void MainWindow::onClickedLoadOnlineDict()
 	}
 
 	for (int row = 0; row < TableRowCount; ++row) {
-		QTableWidgetItem* col2 = m_tableWidgetDict->item(row, 2);
+		QTableWidgetItem* itemTranslation = m_tableWidgetDict->item(row, DICT_COL_NEW_TRANSLATION);
 		QString           line(lines.at(row));
 		Utils::restoreNewLine(line);
-		col2->setText(line);
+		itemTranslation->setText(line);
 	}
 }
 
@@ -351,7 +378,7 @@ void MainWindow::onClickedExportOnlineDictTemplate()
 
 	const int TableRowCount = m_tableWidgetDict->rowCount();
 	for (int row = 0; row < TableRowCount; ++row) {
-		QString src = m_tableWidgetDict->item(row, 1)->text();
+		QString src = m_tableWidgetDict->item(row, DICT_COL_SRC)->text();
 		Utils::removeNewLine(src);
 		textStream << src << Qt::endl;
 	}
@@ -475,6 +502,16 @@ void MainWindow::onToggledIgnore()
 	refreshFixedDictValid();
 }
 
+void MainWindow::setUseFixedDict(bool b)
+{
+	m_useFixedDict = b;
+	m_lineEditFixedDict->setEnabled(b);
+	m_btnFixedDictBrowse->setEnabled(b);
+	m_btnFixedDictLoad->setEnabled(b);
+	m_btnFixedDictSave->setEnabled(b);
+	m_groupBoxFixedDict->setVisible(b);
+}
+
 void MainWindow::reloadTsTable()
 {
 	//qDebug("reloadTsTable");
@@ -497,12 +534,12 @@ void MainWindow::reloadTsTable()
 		if (ignoreObsolete && (tsItem.type == TSManager::Vanished || tsItem.type == TSManager::Obsolete))
 			continue;
 
-		if (m_fixedDict.contains(tsItem.src))
+		if (m_useFixedDict && m_fixedDict.contains(tsItem.src))
 			continue;
 
 		m_tableWidgetDict->setRowCount(row + 1);
 
-		setDictRow(row, tsItem.type, tsItem.src, tsItem.translation);
+		setDictRow(row, tsItem.type, tsItem.src, tsItem.translation, m_tableDict.value(tsItem.src));
 
 		++row;
 	}
@@ -515,11 +552,11 @@ void MainWindow::refreshFixedDictValid()
 
 	int RowCount = m_tableWidgetFixedDict->rowCount();
 	for (int row = 0; row < RowCount; ++row) {
-		QTableWidgetItem* col0     = m_tableWidgetFixedDict->item(row, 0);
-		QTableWidgetItem* col1     = m_tableWidgetFixedDict->item(row, 1);
+		QTableWidgetItem* itemValid = m_tableWidgetFixedDict->item(row, FIXED_DICT_COL_VALID);
+		QTableWidgetItem* itemSrc   = m_tableWidgetFixedDict->item(row, FIXED_DICT_COL_SRC);
 
-		const bool srcValid = tsItems.contains(col1->text());
-		col0->setText(srcValid ? "Yes": QString());
+		const bool srcValid = tsItems.contains(itemSrc->text());
+		itemValid->setText(srcValid ? "Yes": QString());
 	}
 }
 
@@ -543,8 +580,8 @@ void MainWindow::moveDictToFixed()
 
 	//qDebug("Selected Top=%d, Bottom=%d", top, bottom);
 	for (int i = top; i <= bottom; ++i) {
-		const QString src = m_tableWidgetDict->item(top, 1)->text();
-		const QString translation = m_tableWidgetDict->item(top, 2)->text();
+		const QString src = m_tableWidgetDict->item(top, DICT_COL_SRC)->text();
+		const QString translation = m_tableWidgetDict->item(top, DICT_COL_NEW_TRANSLATION)->text();
 
 		const int TableRowCount = m_tableWidgetFixedDict->rowCount();
 		m_tableWidgetFixedDict->setRowCount(TableRowCount + 1);
@@ -584,7 +621,7 @@ void MainWindow::moveFixedToDict()
 	const auto tsItems = m_tsManager->items();
 
 	for (int i = top; i <= bottom; ++i) {
-		const QString src = m_tableWidgetFixedDict->item(top, 1)->text();
+		const QString src = m_tableWidgetFixedDict->item(top, FIXED_DICT_COL_SRC)->text();
 
 		if (!tsItems.contains(src)) {
 			++top; // skip
@@ -594,7 +631,7 @@ void MainWindow::moveFixedToDict()
 		const TSManager::Item& tsItem        = tsItems.value(src);
 		const int              TableRowCount = m_tableWidgetDict->rowCount();
 		m_tableWidgetDict->setRowCount(TableRowCount + 1);
-		setDictRow(TableRowCount, tsItem.type, src, tsItem.translation);
+		setDictRow(TableRowCount, tsItem.type, src, tsItem.translation, QString());
 
 		m_fixedDictManager->removeSrc(src);
 		m_fixedDict.remove(src);
@@ -614,14 +651,26 @@ void MainWindow::clearFixedDict()
 	reloadTsTable();
 }
 
-void MainWindow::onFixedDictCellChanged(int row, int col)
+void MainWindow::onDictCellChanged(int row, int col)
 {
-	if (2 == col) {
-		const QString src = m_tableWidgetFixedDict->item(row, 1)->text();
+	if (DICT_COL_NEW_TRANSLATION == col) {
+		const QString src = m_tableWidgetDict->item(row, DICT_COL_SRC)->text();
 		if (src.isEmpty())
 			return;
 
-		const QString transaltion = m_tableWidgetFixedDict->item(row, 2)->text();
+		const QString transaltion = m_tableWidgetDict->item(row, DICT_COL_NEW_TRANSLATION)->text();
+		m_tableDict[src]          = transaltion;
+	}
+}
+
+void MainWindow::onFixedDictCellChanged(int row, int col)
+{
+	if (FIXED_DICT_COL_TRANSLATION == col) {
+		const QString src = m_tableWidgetFixedDict->item(row, FIXED_DICT_COL_SRC)->text();
+		if (src.isEmpty())
+			return;
+
+		const QString transaltion = m_tableWidgetFixedDict->item(row, FIXED_DICT_COL_TRANSLATION)->text();
 		m_fixedDictManager->setTransaltion(currentLanguage(), src, transaltion);
 		m_fixedDict[src]          = transaltion;
 
@@ -631,7 +680,7 @@ void MainWindow::onFixedDictCellChanged(int row, int col)
 
 void MainWindow::onSwitchToLanguage(const QString& lang)
 {
-	qDebug("onSwitchToLanguage=%s", qPrintable(lang));
+	//qDebug("onSwitchToLanguage=%s", qPrintable(lang));
 	if (lang.isEmpty())
 		return;
 
@@ -653,7 +702,7 @@ void MainWindow::onSwitchToLanguage(const QString& lang)
 
 bool MainWindow::eventFilter(QObject* watched, QEvent* event)
 {
-	if (event->type() == QEvent::ContextMenu) {
+	if (m_useFixedDict && event->type() == QEvent::ContextMenu) {
 		QContextMenuEvent* cmEvent = static_cast<QContextMenuEvent*>(event);
 
 		if (watched == m_tableWidgetDict) {
@@ -671,12 +720,19 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
 	return QWidget::eventFilter(watched, event);
 }
 
-void MainWindow::setDictRow(int row, int itemType, const QString& src, const QString& translation) {
-	QTableWidgetItem* col[3] = {new QTableWidgetItem, new QTableWidgetItem, new QTableWidgetItem};
+void MainWindow::setDictRow(int row, int itemType, const QString& src, const QString& oldTranslation, const QString& newTranslation)
+{
+	QTableWidgetItem* col[DICT_COLUMN_COUNT];
+	for (int i = 0; i < DICT_COLUMN_COUNT; ++i) {
+		col[i] = new QTableWidgetItem;
+		col[i]->setFlags(col[i]->flags() & (~Qt::ItemIsEditable));
+		m_tableWidgetDict->setItem(row, i, col[i]);
+	}
+
 	switch (itemType) {
 #define CASE(x) \
 	case TSManager::x: \
-		col[0]->setText(#x); \
+		col[DICT_COL_STATUS]->setText(#x); \
 		break;
 
 		CASE(Finished)
@@ -689,26 +745,27 @@ void MainWindow::setDictRow(int row, int itemType, const QString& src, const QSt
 		break;
 	}
 
-	col[1]->setText(src);
-	col[2]->setText(translation);
-
-	for (int i = 0; i < 3; ++i)
-		m_tableWidgetDict->setItem(row, i, col[i]);
+	col[DICT_COL_SRC]->setText(src);
+	col[DICT_COL_OLD_TRANSLATION]->setText(oldTranslation);
+	col[DICT_COL_NEW_TRANSLATION]->setText(newTranslation);
+	col[DICT_COL_NEW_TRANSLATION]->setFlags(col[DICT_COL_NEW_TRANSLATION]->flags() | Qt::ItemIsEditable);
 }
 
 void MainWindow::setFixedDictRow(int row, const QString& src, const QString& translation)
 {
-	QTableWidgetItem* col[3] = {new QTableWidgetItem, new QTableWidgetItem, new QTableWidgetItem};
-	for (int i = 0; i < 3; ++i)
+	QTableWidgetItem* col[FIXED_DICT_COLUMN_COUNT];
+	for (int i = 0; i < FIXED_DICT_COLUMN_COUNT; ++i) {
+		col[i] = new QTableWidgetItem;
 		m_tableWidgetFixedDict->setItem(row, i, col[i]);
+	}
 
 	auto setReadOnly = [](QTableWidgetItem* item) { item->setFlags(item->flags() & (~Qt::ItemIsEditable)); };
 
-	setReadOnly(col[0]);
-	setReadOnly(col[1]);
+	setReadOnly(col[FIXED_DICT_COL_VALID]);
+	setReadOnly(col[FIXED_DICT_COL_SRC]);
 
-	col[1]->setText(src);
-	col[2]->setText(translation);
+	col[FIXED_DICT_COL_SRC]->setText(src);
+	col[FIXED_DICT_COL_TRANSLATION]->setText(translation);
 }
 
 QString MainWindow::currentLanguage() const
